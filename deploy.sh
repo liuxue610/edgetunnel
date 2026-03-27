@@ -11,7 +11,7 @@ TYPE_JSON="Content-Type:application/json"
 FORM_FILE="_worker.js=@$ENTRY;type=application/javascript+module"
 MAIN_MODULE='"main_module":"_worker.js"'
 PLACEMENT='"placement":{"mode":"smart"}'
-COMPATIBILITY_DATE='"compatibility_date":"2024-06-20"'
+COMPATIBILITY_DATE='"compatibility_date":"2026-02-24"'
 OBSERVABILITY='"observability":{"logs":{"enabled":true,"head_sampling_rate":1,"invocation_logs":true}}'
 #--------------------------
 upload_worker(){
@@ -47,7 +47,8 @@ page_deployment(){
 }
 create_page(){
 	[ $pageBranch != main ] && local preview=',"preview_branch":"'$pageBranch'"'
-	local data='{"name":"'$1'","production_branch":"main"'$preview'}'
+	local deployConfigs='"deployment_configs":{"'$CF_PAGE_ENV'":{'$PLACEMENT,$COMPATIBILITY_DATE,$2'}}'
+	local data='{"name":"'$1'","production_branch":"main"'$preview,$deployConfigs'}'
 	curl -X POST -H "$AUTH" -H "$TYPE_JSON" -d "$data" $CF_PROJECT_API
 }
 upload_page(){
@@ -56,7 +57,7 @@ upload_page(){
 		$CF_PROJECT_API/$1/deployments
 }
 patch_page(){
-	local data='{"deployment_configs":{"'$CF_PAGE_ENV'":{'$PLACEMENT,$2'}}}'
+	local data='{"deployment_configs":{"'$CF_PAGE_ENV'":{'$2'}}}'
 	curl -X PATCH -H "$AUTH" -H "$TYPE_JSON" -d "$data" $CF_PROJECT_API/$1
 }
 #-------------------
@@ -110,9 +111,8 @@ deploy_page(){
 	
 	ret=`page_deployment $1`
 	if [ "$ret" == null ]; then
-		ret=`create_page $1`
+		ret=$(create_page $1 `generate_configs $2`)
 		post_handle "$ret" 'create_page' || exit 1
-		configs=`generate_configs $2`
 	elif [ "$ret" == [] ]; then
 		configs=`generate_configs $2`
 	else
